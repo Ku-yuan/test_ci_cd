@@ -68,9 +68,9 @@ jobs:
         run: uv python install 3.12
       
       # 步骤 4: 安装依赖
-      # --dev 会同时安装开发依赖（包括 ruff）
+      # --extra dev 会安装 optional-dependencies 中的 dev 依赖（包括 ruff）
       - name: 安装依赖
-        run: uv sync --dev
+        run: uv sync --extra dev
       
       # 步骤 5: 运行代码检查
       # ruff check: 检查代码风格和潜在问题
@@ -114,7 +114,7 @@ jobs:
         run: uv python install ${{ matrix.python-version }}
       
       - name: 安装依赖
-        run: uv sync --dev
+        run: uv sync --extra dev
       
       # 运行 pytest 测试
       # -v: 详细输出
