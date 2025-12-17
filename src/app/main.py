@@ -221,6 +221,11 @@ async def delete_item(item_id: int):
     return {"message": f"商品 ID {item_id} 已成功删除"}
 
 
+@app.get("/test", response_model=Message)
+async def test():
+    return {"message": "test"}
+
+
 # ============================================
 # 启动说明
 # ============================================
