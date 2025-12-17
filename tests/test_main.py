@@ -254,6 +254,13 @@ class TestDataValidation:
         assert response.status_code == 422
 
 
+class TestTest:
+    async def test_test(self, client: AsyncClient):
+        response = await client.get("/test")
+        assert response.status_code == 200
+        assert response.json() == {"message": "test"}
+
+
 # ============================================
 # 运行测试说明
 # ============================================
