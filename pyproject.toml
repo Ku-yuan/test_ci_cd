@@ -1,0 +1,92 @@
+# ============================================
+# FastAPI 项目配置文件
+# 使用 uv 作为包管理器
+# ============================================
+
+[project]
+# 项目名称
+name = "fastapi-cicd-demo"
+# 项目版本号，遵循语义化版本规范 (主版本.次版本.修订号)
+version = "0.1.0"
+# 项目描述
+description = "一个用于学习 GitHub CI/CD 的 FastAPI 示例项目"
+# 项目作者信息
+authors = [
+    { name = "Your Name", email = "your.email@example.com" }
+]
+# 项目使用的许可证
+license = { text = "MIT" }
+# 项目的 README 文件
+readme = "README.md"
+# 支持的 Python 版本范围
+requires-python = ">=3.10"
+
+# ============================================
+# 项目依赖
+# 这些是项目运行必需的包
+# ============================================
+dependencies = [
+    # FastAPI - 现代、快速的 Python Web 框架
+    "fastapi>=0.104.0",
+    # Uvicorn - ASGI 服务器，用于运行 FastAPI 应用
+    "uvicorn[standard]>=0.24.0",
+    # Pydantic - 数据验证库，FastAPI 内部使用
+    "pydantic>=2.5.0",
+]
+
+# ============================================
+# 开发依赖
+# 这些包仅在开发和测试时需要
+# ============================================
+[project.optional-dependencies]
+dev = [
+    # pytest - Python 测试框架
+    "pytest>=7.4.0",
+    # pytest-asyncio - 支持异步测试
+    "pytest-asyncio>=0.21.0",
+    # httpx - 异步 HTTP 客户端，用于测试 FastAPI
+    "httpx>=0.25.0",
+    # ruff - 快速的 Python 代码检查和格式化工具
+    "ruff>=0.1.0",
+]
+
+# ============================================
+# 构建系统配置
+# 指定使用 hatchling 作为构建后端
+# ============================================
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+# ============================================
+# Hatchling 构建配置
+# ============================================
+[tool.hatch.build.targets.wheel]
+# 指定源代码目录
+packages = ["src"]
+
+# ============================================
+# Ruff 配置 - 代码检查和格式化
+# ============================================
+[tool.ruff]
+# 目标 Python 版本
+target-version = "py310"
+# 每行最大字符数
+line-length = 88
+# 选择启用的规则集
+select = [
+    "E",   # pycodestyle 错误
+    "W",   # pycodestyle 警告
+    "F",   # Pyflakes
+    "I",   # isort (导入排序)
+    "UP",  # pyupgrade (Python 版本升级建议)
+]
+
+# ============================================
+# pytest 配置
+# ============================================
+[tool.pytest.ini_options]
+# 启用异步测试模式
+asyncio_mode = "auto"
+# 测试文件匹配模式
+testpaths = ["tests"]

@@ -1,0 +1,253 @@
+# ============================================
+# GitHub Actions CI/CD 工作流配置文件
+# ============================================
+#
+# 这个文件定义了持续集成 (CI) 和持续部署 (CD) 的自动化流程。
+# 当代码推送到仓库时，GitHub Actions 会自动执行这些任务。
+#
+# 文件位置：.github/workflows/ci.yml
+# GitHub 会自动检测这个目录下的 YAML 文件并执行工作流
+
+# 工作流名称 - 会显示在 GitHub Actions 页面
+name: CI/CD Pipeline
+
+# ============================================
+# 触发条件 (on)
+# 定义什么情况下触发这个工作流
+# ============================================
+on:
+  # 推送到以下分支时触发
+  push:
+    branches:
+      - main      # 主分支
+      - develop   # 开发分支
+  
+  # Pull Request 合并到以下分支时触发
+  pull_request:
+    branches:
+      - main
+  
+  # 允许手动触发工作流
+  # 在 GitHub Actions 页面可以看到 "Run workflow" 按钮
+  workflow_dispatch:
+
+# ============================================
+# 作业定义 (jobs)
+# 一个工作流可以包含多个作业，作业可以并行或串行执行
+# ============================================
+jobs:
+  
+  # ------------------------------------------
+  # 作业 1: 代码检查 (Lint)
+  # ------------------------------------------
+  lint:
+    # 作业名称，显示在 GitHub Actions UI 中
+    name: 代码风格检查
+    
+    # 运行环境 - 使用最新的 Ubuntu 系统
+    runs-on: ubuntu-latest
+    
+    # 作业步骤
+    steps:
+      # 步骤 1: 检出代码
+      # actions/checkout 是 GitHub 官方提供的动作
+      # 它会将仓库代码克隆到运行器上
+      - name: 检出代码
+        uses: actions/checkout@v4
+      
+      # 步骤 2: 安装 uv
+      # astral-sh/setup-uv 是 uv 官方提供的 GitHub Action
+      - name: 安装 uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          # 启用缓存，加速后续构建
+          enable-cache: true
+      
+      # 步骤 3: 设置 Python 环境
+      - name: 设置 Python
+        run: uv python install 3.12
+      
+      # 步骤 4: 安装依赖
+      # --dev 会同时安装开发依赖（包括 ruff）
+      - name: 安装依赖
+        run: uv sync --dev
+      
+      # 步骤 5: 运行代码检查
+      # ruff check: 检查代码风格和潜在问题
+      # ruff format --check: 检查代码格式（不修改文件）
+      - name: 运行 Ruff 代码检查
+        run: |
+          uv run ruff check src/ tests/
+          uv run ruff format --check src/ tests/
+
+  # ------------------------------------------
+  # 作业 2: 测试 (Test)
+  # ------------------------------------------
+  test:
+    # 作业名称
+    name: 运行测试
+    
+    # 运行环境
+    runs-on: ubuntu-latest
+    
+    # 依赖关系 - 等待 lint 作业完成后再执行
+    # 这意味着如果代码检查失败，测试不会运行
+    needs: lint
+    
+    # 矩阵策略 - 在多个 Python 版本上测试
+    # 确保代码在不同版本的 Python 上都能正常工作
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+    
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+      
+      - name: 安装 uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+      
+      # 使用矩阵中的 Python 版本
+      - name: 设置 Python ${{ matrix.python-version }}
+        run: uv python install ${{ matrix.python-version }}
+      
+      - name: 安装依赖
+        run: uv sync --dev
+      
+      # 运行 pytest 测试
+      # -v: 详细输出
+      # --tb=short: 简短的错误追踪信息
+      - name: 运行测试
+        run: uv run pytest -v --tb=short
+
+  # ------------------------------------------
+  # 作业 3: 构建验证 (Build)
+  # ------------------------------------------
+  build:
+    name: 构建验证
+    runs-on: ubuntu-latest
+    
+    # 等待测试通过
+    needs: test
+    
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+      
+      - name: 安装 uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+      
+      - name: 设置 Python
+        run: uv python install 3.12
+      
+      - name: 安装依赖
+        run: uv sync
+      
+      # 验证应用可以正常导入
+      # 这确保没有导入错误或语法错误
+      - name: 验证应用可以启动
+        run: |
+          uv run python -c "from src.app.main import app; print('应用导入成功！')"
+      
+      # 构建 Python 包
+      # 这会创建 wheel 和 sdist 分发包
+      - name: 构建包
+        run: uv build
+      
+      # 上传构建产物
+      # 可以在 Actions 页面下载这些文件
+      - name: 上传构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          # 保留 7 天
+          retention-days: 7
+
+  # ------------------------------------------
+  # 作业 4: 部署 (Deploy) - 仅在主分支
+  # ------------------------------------------
+  deploy:
+    name: 部署到生产环境
+    runs-on: ubuntu-latest
+    
+    # 等待构建完成
+    needs: build
+    
+    # 条件执行 - 只在推送到 main 分支时执行
+    # github.ref == 'refs/heads/main' 检查当前分支
+    # github.event_name == 'push' 确保是推送事件（不是 PR）
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    
+    # 环境配置 - 可以在 GitHub 仓库设置中配置
+    # 支持保护规则（如需要审批）和环境秘密
+    environment:
+      name: production
+      # 部署后的应用 URL（示例）
+      url: https://your-app-url.com
+    
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+      
+      # 下载之前构建的产物
+      - name: 下载构建产物
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      
+      # 这里是实际的部署步骤
+      # 根据你的部署目标（如 Heroku、AWS、Azure 等），
+      # 替换为相应的部署命令
+      - name: 部署应用
+        run: |
+          echo "🚀 部署到生产环境..."
+          echo "构建产物:"
+          ls -la dist/
+          echo "✅ 部署完成！"
+          # 
+          # 实际部署示例（取消注释并配置）：
+          #
+          # 部署到 Heroku:
+          # heroku container:push web --app your-app-name
+          # heroku container:release web --app your-app-name
+          #
+          # 部署到 AWS ECS:
+          # aws ecs update-service --cluster your-cluster --service your-service --force-new-deployment
+          #
+          # 部署到 Docker Hub:
+          # docker build -t your-image:${{ github.sha }} .
+          # docker push your-image:${{ github.sha }}
+
+# ============================================
+# 工作流说明
+# ============================================
+#
+# 这个 CI/CD 流程包含 4 个阶段：
+#
+# 1. 代码检查 (lint)
+#    - 使用 Ruff 检查代码风格
+#    - 确保代码符合 Python 最佳实践
+#
+# 2. 测试 (test)
+#    - 在多个 Python 版本上运行测试
+#    - 依赖 lint 阶段通过
+#
+# 3. 构建 (build)
+#    - 验证应用可以正常导入
+#    - 构建 Python 分发包
+#    - 上传构建产物
+#
+# 4. 部署 (deploy)
+#    - 仅在 main 分支上执行
+#    - 下载构建产物并部署
+#
+# 工作流执行顺序：
+# lint → test → build → deploy
+#
+# 如果任何阶段失败，后续阶段不会执行
